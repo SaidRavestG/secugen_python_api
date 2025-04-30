@@ -163,13 +163,53 @@ def initialize_sdk():
     # Abrir dispositivo si no está abierto
     if not device_opened:
         error_code = sgfplib.SGFPM_OpenDevice(hFPM, 0) # Abrir dispositivo ID 0
-        if not _check_error(error_code, "SGFPM_OpenDevice"):
+        open_success = _check_error(error_code, "SGFPM_OpenDevice") # Guarda el resultado de la verificación
+        if not open_success:
             terminate_sdk() # Intentar limpiar si Open falla
             return False
-        device_opened = True
-        logger.info("Dispositivo abierto.")
+        # --- INICIO: Bloque de Parpadeo Añadido ---
+        else: # Si open_success es True
+            device_opened = True # Marcar como abierto AHORA
+            logger.info("Dispositivo abierto.")
 
-    return True # Todo OK
+            # --- Intento de Parpadeo (PUEDE FALLAR) ---
+            logger.info("Intentando parpadeo de LED (3 veces)...")
+            blink_attempts_ok = True # Flag para saber si hubo error *durante* el parpadeo
+            for i in range(3): # Repetir 3 veces
+                logger.debug(f"Parpadeo {i+1}/3: Encendiendo...")
+                # Encender (Usamos la función wrapper set_led que ya maneja el error 2)
+                if not set_led(True):
+                    blink_attempts_ok = False
+                    # No es necesario 'break', podemos intentar apagar de todos modos
+                    # o simplemente registrar que falló el ON
+                    logger.warning(f"Parpadeo {i+1}/3: Fallo al ENCENDER LED.")
+                else:
+                    time.sleep(0.2) # LED encendido por 0.2 segundos (solo si funcionó)
+
+                logger.debug(f"Parpadeo {i+1}/3: Apagando...")
+                # Apagar
+                if not set_led(False):
+                    blink_attempts_ok = False
+                    logger.warning(f"Parpadeo {i+1}/3: Fallo al APAGAR LED.")
+                else:
+                     # Solo esperamos si el apagado funcionó, sino pasamos al siguiente ciclo
+                     time.sleep(0.2) # LED apagado por 0.2 segundos
+
+                # Pequeña pausa entre ciclos completos si ambos funcionaron
+                if blink_attempts_ok:
+                    time.sleep(0.1)
+
+
+            if blink_attempts_ok:
+                 logger.info("Secuencia de parpadeo completada (intentada sin errores fatales devueltos por set_led).")
+            else:
+                 logger.warning("La secuencia de parpadeo falló en algún punto (ver logs). La inicialización del SDK continúa.")
+            # -------------------------------------------
+         # --- FIN: Bloque de Parpadeo Añadido ---
+
+    # La inicialización general se considera exitosa si llegamos aquí
+    logger.info("Inicialización del SDK completada (incluyendo intento de parpadeo).")
+    return True # Devolver True indica que Init y Open funcionaron
 
 def terminate_sdk():
     """Cierra el dispositivo y termina el SDK."""

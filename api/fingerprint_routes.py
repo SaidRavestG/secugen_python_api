@@ -4,7 +4,8 @@ from flask import Blueprint, jsonify, request, current_app
 
 # Importar el módulo wrapper con nuestras funciones SDK
 from .sdk_interface import wrapper as sdk_wrapper
-
+from . import db 
+from .models import User, Fingerprint # Importar modelos de models.py
 # Crear el Blueprint para estas rutas
 # Usaremos 'fingerprint_api' como nombre interno para el blueprint
 fingerprint_bp = Blueprint('fingerprint_api', __name__)
@@ -127,3 +128,68 @@ def verify():
     else:
         # verify_templates devuelve True si coinciden, False si no.
         return jsonify({"success": True, "match": match_result}), 200
+    
+@fingerprint_bp.route('/enroll', methods=['POST'])
+def enroll_fingerprint():
+    """
+    Endpoint para enrolar/registrar una nueva huella para un usuario.
+    Espera JSON: {"user_id": <id>, "finger_position": "nombre_dedo"}
+    """
+    current_app.logger.info("API Request: /enroll")
+    if not is_sdk_ready(): # Usar la función helper si la tienes
+         current_app.logger.warning("Enroll request pero SDK no listo.")
+         return jsonify({"success": False, "message": "SDK no inicializado o dispositivo no abierto."}), 503
+
+    # 1. Validar Input JSON
+    if not request.is_json:
+        return jsonify({"success": False, "message": "Cuerpo de la solicitud debe ser JSON."}), 400
+
+    data = request.get_json()
+    user_id = data.get('user_id')
+    finger_position = data.get('finger_position')
+
+    if not user_id or not finger_position:
+        return jsonify({"success": False, "message": "Faltan 'user_id' o 'finger_position' en el cuerpo JSON."}), 400
+
+    # 2. Verificar que el usuario exista
+    user = User.query.get(user_id) # Busca usuario por ID
+    if not user:
+        current_app.logger.warning(f"Intento de enrolar para user_id {user_id} no existente.")
+        return jsonify({"success": False, "message": f"Usuario con ID {user_id} no encontrado."}), 404
+
+    # 3. (Opcional) Verificar si ya existe huella para ese dedo y usuario
+    existing_fp = Fingerprint.query.filter_by(user_id=user_id, finger_position=finger_position).first()
+    if existing_fp:
+        # Podrías permitir sobreescribir o devolver error. Devolvemos error por ahora.
+        current_app.logger.warning(f"Intento de enrolar dedo '{finger_position}' que ya existe para user_id {user_id}.")
+        return jsonify({"success": False, "message": f"Ya existe una huella registrada para el dedo '{finger_position}' de este usuario."}), 409 # 409 Conflict
+
+    # 4. Capturar la plantilla de la huella
+    current_app.logger.info(f"Iniciando captura para user_id={user_id}, finger='{finger_position}'. Pide al usuario colocar el dedo.")
+    template_b64 = sdk_wrapper.capture_template()
+
+    if not template_b64:
+        current_app.logger.error("wrapper.capture_template() falló durante el enrolamiento.")
+        return jsonify({"success": False, "message": "Fallo durante la captura o extracción de plantilla desde el lector."}), 500
+
+    # 5. Crear y guardar el registro en la BD
+    try:
+        new_fingerprint = Fingerprint(
+            user_id=user_id,
+            finger_position=finger_position,
+            template_data=template_b64,
+            template_format='SG400' # Asumiendo SG400 por defecto
+        )
+        db.session.add(new_fingerprint)
+        db.session.commit()
+        current_app.logger.info(f"Huella enrolada exitosamente con ID: {new_fingerprint.id} para user_id: {user_id}")
+        # Devolvemos el ID del registro creado y un mensaje
+        return jsonify({
+            "success": True,
+            "message": "Huella registrada exitosamente.",
+            "fingerprint_id": new_fingerprint.id
+            }), 201 # 201 Created
+    except Exception as e:
+        db.session.rollback() # Revertir cambios en caso de error de BD
+        current_app.logger.error(f"Error al guardar huella en BD para user_id {user_id}: {e}")
+        return jsonify({"success": False, "message": "Error interno al guardar la huella en la base de datos."}), 500

@@ -1,0 +1,108 @@
+API SecuGen - Documentación de Endpoints
+=====================================
+
+Todos los endpoints están bajo el prefijo base: /api/v1/fingerprint
+
+1. Inicialización del SDK
+------------------------
+POST /initialize
+- Descripción: Inicializa el SDK y abre el dispositivo
+- Respuesta exitosa (200):
+  {
+    "success": true,
+    "message": "SDK inicializado y dispositivo abierto correctamente"
+  }
+
+2. Terminación del SDK
+---------------------
+POST /terminate
+- Descripción: Cierra el dispositivo y termina el SDK
+- Respuesta exitosa (200):
+  {
+    "success": true,
+    "message": "SDK terminado correctamente"
+  }
+
+3. Estado del Dispositivo
+------------------------
+GET /status
+- Descripción: Obtiene información y estado del lector conectado
+- Respuesta exitosa (200):
+  {
+    "success": true,
+    "status": "ok",
+    "device_info": {
+      "device_id": "...",
+      "serial_number": "...",
+      "image_width": 260,
+      "image_height": 300,
+      "image_dpi": 500,
+      "fw_version": "..."
+    }
+  }
+
+4. Control del LED
+-----------------
+POST /led
+- Descripción: Enciende o apaga el LED del lector
+- Body (JSON):
+  {
+    "state": true/false
+  }
+- Respuesta exitosa (200):
+  {
+    "success": true,
+    "message": "Comando para poner LED en ON/OFF enviado"
+  }
+
+5. Captura de Huella
+-------------------
+POST /capture
+- Descripción: Captura una huella y devuelve la plantilla en Base64
+- Respuesta exitosa (200):
+  {
+    "success": true,
+    "template": "base64_string..."
+  }
+
+6. Verificación de Huellas
+-------------------------
+POST /verify
+- Descripción: Compara dos plantillas de huellas
+- Body (JSON):
+  {
+    "template1": "base64_string...",
+    "template2": "base64_string..."
+  }
+- Respuesta exitosa (200):
+  {
+    "success": true,
+    "match": true/false
+  }
+
+7. Registro de Huella
+--------------------
+POST /enroll
+- Descripción: Registra una nueva huella para un usuario
+- Body (JSON):
+  {
+    "user_id": 123,
+    "finger_position": "nombre_dedo"
+  }
+- Respuesta exitosa (201):
+  {
+    "success": true,
+    "message": "Huella registrada exitosamente",
+    "fingerprint_id": 456
+  }
+
+Notas Importantes:
+-----------------
+1. Antes de usar cualquier endpoint, es necesario inicializar el SDK con /initialize
+2. Al terminar, es recomendable llamar a /terminate
+3. El formato de las plantillas es Base64
+4. Los códigos de error comunes:
+   - 400: Error en el formato de la petición
+   - 404: Recurso no encontrado
+   - 500: Error interno del servidor
+   - 503: SDK no inicializado o dispositivo no abierto 

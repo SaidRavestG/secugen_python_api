@@ -1,0 +1,17 @@
+# Entorno virtual
+venv/
+__pycache__/
+*.pyc
+
+# Git
+.git/
+.gitignore
+
+# Archivos de desarrollo
+*.log
+.env
+.env.*
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db 

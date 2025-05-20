@@ -1,4 +1,4 @@
-#!/home/said/Escritorio/Phyton_api/venv/bin/python3
+#!/home/sigma/secugen_python_api/venv/bin/python3
 # -*- coding: utf-8 -*-
 import re
 import sys

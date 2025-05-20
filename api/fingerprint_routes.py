@@ -3,7 +3,7 @@
 from flask import Blueprint, jsonify, request, current_app
 
 # Importar el módulo wrapper con nuestras funciones SDK
-from .sdk_interface import wrapper as sdk_wrapper
+from .sdk_interface import wrapper as sdk_wrapper 
 from . import db 
 from .models import User, Fingerprint # Importar modelos de models.py
 # Crear el Blueprint para estas rutas
